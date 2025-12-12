@@ -1,4 +1,8 @@
-const API_BASE_URL = 'https://iot-backend-ipqy.onrender.com/';
+const API_BASE_URL = 'https://iot-backend-ipqy.onrender.com/api';
+
+const IS_CLOUD = location.protocol === 'https:';
+const IS_ESP_MODE = location.hostname === '192.168.4.1';
+
 
 let currentUser = null;
 let currentDevice = null;
@@ -81,7 +85,10 @@ document.addEventListener('DOMContentLoaded', initApp);
 function initApp() {
   readLocalAuth();
   attachFormHandlers();
+if (typeof attachUIHelpers === "function") {
   attachUIHelpers();
+}
+
   if (authToken && currentUser) {
     showDashboard();
     loadDevices();
@@ -452,46 +459,47 @@ async function openDeviceControl(deviceId) {
 
 // Wi-Fi Setup Functions
 function startWifiSetup() {
+  if (!IS_ESP_MODE) {
+    showAlert(
+      'Wi-Fi setup works only when connected to the ESP device.\n\n' +
+      'Please connect to ESP WiFi and open 192.168.4.1'
+    );
+    return;
+  }
+
   const dialog = document.getElementById('wifiSetupDialog');
   const step1 = document.getElementById('step1');
   const step2 = document.getElementById('step2');
-  
-  // Show dialog and first step
+
   dialog.style.display = 'block';
   step1.style.display = 'block';
   step2.style.display = 'none';
 }
 
 function confirmWifiConnection() {
+  if (!IS_ESP_MODE) return;
+
   const step1 = document.getElementById('step1');
   const step2 = document.getElementById('step2');
   const setupFrame = document.getElementById('setupFrame');
-  
-  // Try to detect if user is connected to ESP32 AP
-  if (window.location.hostname !== '192.168.4.1') {
-    // Load the ESP32 configuration page in the iframe
-    setupFrame.src = 'http://192.168.4.1';
-  }
-  
-  // Show second step
+
+  setupFrame.src = 'http://192.168.4.1';
+
   step1.style.display = 'none';
   step2.style.display = 'block';
 }
 
 function finishWifiSetup() {
   const dialog = document.getElementById('wifiSetupDialog');
-  
-  // Hide the setup dialog
   dialog.style.display = 'none';
-  
-  // Show success message
-  showAlert('Wi-Fi setup completed! Device will now connect to your network.');
-  
-  // Reload device state after a delay to allow ESP32 to connect
+
+  showAlert('Wi-Fi setup completed. Device will connect shortly.');
+
   setTimeout(() => {
     loadDeviceState();
   }, 5000);
 }
+
 
 async function loadDeviceState() {
   if (!currentDevice || !authToken) return;
