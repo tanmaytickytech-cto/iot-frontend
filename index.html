@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Relay Control</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="wifi-setup.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Additional styles for the new UI elements */
+        .schedule-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .timer-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .schedule-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .schedule-info {
+            flex-grow: 1;
+        }
+
+        .schedule-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-small.btn-danger {
+            background-color: #ff4757;
+            color: white;
+        }
+
+        .btn-small:hover {
+            opacity: 0.9;
+        }
+
+        .status.enabled {
+            color: #2ed573;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status.disabled {
+            color: #ff6b81;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .schedules-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .timer-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        /* Device card delete button styles */
+        .device-card {
+            position: relative;
+        }
+
+        .device-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        .delete-device-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .delete-device-btn:hover {
+            background: #ff6b81;
+        }
+
+        /* Relay indicators styles */
+        .relay-indicators {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .relay-indicator {
+            background: #e0e0e0;
+            color: #666;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .relay-indicator.active {
+            background: #2ed573;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Section -->
+        <div id="loginSection" class="section active">
+            <div class="auth-container">
+                <div class="auth-tabs">
+                    <button class="tab-btn active" onclick="showTab('login')">Login</button>
+                    <button class="tab-btn" onclick="showTab('register')">Register</button>
+                </div>
+
+                <div id="login" class="auth-form active">
+                    <h2>Welcome Back</h2>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginPhone">Phone
+                            </label>
+                            <input type="number" id="loginPhone" required placeholder="Enter your phone">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password</label>
+                            <input type="password" id="loginPassword" required placeholder="Enter your password">
+                        </div>
+                        <button type="submit" class="btn-primary">Login</button>
+                    </form>
+                </div>
+
+                <div id="register" class="auth-form">
+                    <h2>Create Account</h2>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="registerName">Full Name</label>
+                            <input type="text" id="registerName" required placeholder="Enter your name">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPhone">Phone</label>
+                            <input type="number" id="registerPhone" required placeholder="Enter your  phone">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPassword">Password</label>
+                            <input type="password" id="registerPassword" required placeholder="Create a password">
+                        </div>
+                        <button type="submit" class="btn-primary">Register</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Section -->
+        <div id="dashboardSection" class="section">
+            <header class="header">
+                <h1>IoT Relay Control</h1>
+                <div class="user-menu">
+                    <span id="userName">User</span>
+                    <button onclick="logout()" class="btn-logout">Logout</button>
+                </div>
+            </header>
+
+            <div class="devices-container">
+                <div class="devices-header">
+                    <h2>My Devices</h2>
+                    <button onclick="showAddDeviceModal()" class="btn-primary">
+                        <i class="fas fa-plus"></i> Add Device
+                    </button>
+                </div>
+
+                <div id="devicesList" class="devices-list">
+                    <!-- Devices will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Device Control Modal -->
+            <div id="deviceModal" class="modal">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal()">&times;</span>
+                    <h2 id="modalTitle">Device Control</h2>
+                    <button onclick="startWifiSetup()" class="btn-primary" style="margin-bottom: 20px;">
+                        <i class="fas fa-wifi"></i> Configure Wi-Fi
+                    </button>
+                    <!-- WiFi Setup Dialog -->
+                    <div id="wifiSetupDialog" class="modal-dialog" style="display: none;">
+                        <div class="modal-content">
+                            <h3>Wi-Fi Setup</h3>
+                            
+                            <!-- Step 1: Connect to ESP32 AP -->
+                            <div id="step1">
+                                <p>1. Connect your device to the ESP32 access point:</p>
+                                <p>Network Name: <strong id="apName">ESP32_AP</strong></p>
+                                <p>Password: <strong>12345678</strong></p>
+                                <button onclick="confirmWifiConnection()" class="btn-primary">I'm Connected</button>
+                            </div>
+                            
+                            <!-- Step 2: Configure WiFi -->
+                            <div id="step2" style="display: none;">
+                                <p>2. Configure your Wi-Fi settings:</p>
+                                <div id="setupFrameContainer">
+                                    <iframe id="setupFrame" src="http://192.168.4.1" style="width: 100%; height: 400px; border: 1px solid #ccc;"></iframe>
+                                </div>
+                                <button onclick="finishWifiSetup()" class="btn-primary">Done</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <span class="close" onclick="closeModal()">&times;</span>
+                    <h2 id="modalTitle">Device Control</h2>
+                    
+                    <div class="relay-controls">
+                        <div class="relay">
+                            <h3>Relay 1</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="relay1" onchange="toggleRelay(1)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="relay">
+                            <h3>Relay 2</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="relay2" onchange="toggleRelay(2)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="relay">
+                            <h3>Relay 3</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="relay3" onchange="toggleRelay(3)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="relay">
+                            <h3>Relay 4</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="relay4" onchange="toggleRelay(4)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Schedule Controls -->
+                    <div class="scheduler">
+                        <h3>Schedule Controls</h3>
+                        <div class="schedule-form">
+                            <div class="form-group">
+                                <label for="scheduleRelay">Relay:</label>
+                                <select id="scheduleRelay">
+                                    <option value="1">Relay 1</option>
+                                    <option value="2">Relay 2</option>
+                                    <option value="3">Relay 3</option>
+                                    <option value="4">Relay 4</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="scheduleAction">Action:</label>
+                                <select id="scheduleAction">
+                                    <option value="on">Turn On</option>
+                                    <option value="off">Turn Off</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="scheduleTime">Time:</label>
+                                <input type="time" id="scheduleTime" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="scheduleDays">Repeat Days:</label>
+                                <select id="scheduleDays" multiple style="height: 100px;">
+                                    <option value="mon">Monday</option>
+                                    <option value="tue">Tuesday</option>
+                                    <option value="wed">Wednesday</option>
+                                    <option value="thu">Thursday</option>
+                                    <option value="fri">Friday</option>
+                                    <option value="sat">Saturday</option>
+                                    <option value="sun">Sunday</option>
+                                </select>
+                                <small>Hold Ctrl/Cmd to select multiple days</small>
+                            </div>
+                            
+                            <button onclick="addSchedule()" class="btn-primary">Add Schedule</button>
+                        </div>
+                        
+                        <!-- Timer Controls -->
+                        <div class="timer-controls">
+                            <h3>Timer Control</h3>
+                            <div class="timer-form">
+                                <div class="form-group">
+                                    <label for="timerRelay">Relay:</label>
+                                    <select id="timerRelay">
+                                        <option value="1">Relay 1</option>
+                                        <option value="2">Relay 2</option>
+                                        <option value="3">Relay 3</option>
+                                        <option value="4">Relay 4</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="timerAction">Action:</label>
+                                    <select id="timerAction">
+                                        <option value="on">Turn Off</option>
+                                        <option value="off">Turn On</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="timerDuration">Duration (minutes):</label>
+                                    <input type="number" id="timerDuration" min="1" max="1440" placeholder="Minutes" required>
+                                </div>
+                                
+                                <button onclick="setTimer()" class="btn-primary">Set Timer</button>
+                            </div>
+                        </div>
+                        
+                        <div id="schedulesList" class="schedules-list">
+                            <!-- Schedules will be listed here -->
+                        </div>
+                    </div>
+                    <!-- Add this in the device modal after scheduler section -->
+<!-- Advanced Power Monitoring Section -->
+<div class="power-monitor">
+    <h3>⚡ Advanced Power Monitoring</h3>
+    
+    <!-- Power Configuration -->
+    <div class="power-configuration">
+        <h4>Configure Device Power Ratings</h4>
+        <div class="power-config-form">
+            <div class="form-group">
+                <label for="powerRating1">Relay 1 Power (Watts):</label>
+                <input type="number" id="powerRating1" step="1" min="0" placeholder="e.g., 60">
+            </div>
+            <div class="form-group">
+                <label for="powerRating2">Relay 2 Power (Watts):</label>
+                <input type="number" id="powerRating2" step="1" min="0" placeholder="e.g., 100">
+            </div>
+            <div class="form-group">
+                <label for="powerRating3">Relay 3 Power (Watts):</label>
+                <input type="number" id="powerRating3" step="1" min="0" placeholder="e.g., 1500">
+            </div>
+            <div class="form-group">
+                <label for="powerRating4">Relay 4 Power (Watts):</label>
+                <input type="number" id="powerRating4" step="1" min="0" placeholder="e.g., 200">
+            </div>
+            <button onclick="configurePowerRatings()" class="btn-primary">Save Power Ratings</button>
+        </div>
+    </div>
+
+    <!-- Electricity Rate Setting -->
+    <div class="rate-setting">
+        <h4>Electricity Rate</h4>
+        <div class="rate-form">
+            <div class="form-group">
+                <label for="ratePerUnit">Rate per kWh (₹):</label>
+                <input type="number" id="ratePerUnit" step="0.01" min="0" placeholder="6.00">
+            </div>
+            <button onclick="updateElectricityRate()" class="btn-primary">Set Rate</button>
+            <div id="currentRateDisplay" class="current-rate">
+                Current rate: ₹<span id="currentRateValue">6.00</span>/kWh
+            </div>
+        </div>
+    </div>
+
+    <!-- Power Summary -->
+    <div class="power-summary">
+        <h4>Power Consumption Summary</h4>
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="card-value" id="totalEnergy">0</div>
+                <div class="card-label">Total Energy (Wh)</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-value" id="energyKWh">0</div>
+                <div class="card-label">Energy (kWh)</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-value" id="totalUnits">0</div>
+                <div class="card-label">Total Units</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-value" id="totalCost">₹0.00</div>
+                <div class="card-label">Total Cost</div>
+            </div>
+        </div>
+        
+        <!-- Period Selector -->
+        <div class="period-selector">
+            <label>View: </label>
+            <select id="periodSelect" onchange="onPeriodChange()">
+                <option value="hourly">Last Hour</option>
+                <option value="daily">Today</option>
+                <option value="weekly">This Week</option>
+                <option value="monthly">This Month</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- NEW: per-relay real‑time cards -->
+    <div class="relay-summary" style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px;">
+        <div class="summary-card" id="relayCard1">
+            <div class="card-label">Relay 1</div>
+            <div class="card-value" id="relay1_power">0 W</div>
+            <div class="card-label" style="font-size:12px;">Energy: <span id="relay1_energy">0.00 Wh</span></div>
+            <div class="card-label" style="font-size:12px;">Cost: <span id="relay1_cost">₹0.00</span></div>
+        </div>
+
+        <div class="summary-card" id="relayCard2">
+            <div class="card-label">Relay 2</div>
+            <div class="card-value" id="relay2_power">0 W</div>
+            <div class="card-label" style="font-size:12px;">Energy: <span id="relay2_energy">0.00 Wh</span></div>
+            <div class="card-label" style="font-size:12px;">Cost: <span id="relay2_cost">₹0.00</span></div>
+        </div>
+
+        <div class="summary-card" id="relayCard3">
+            <div class="card-label">Relay 3</div>
+            <div class="card-value" id="relay3_power">0 W</div>
+            <div class="card-label" style="font-size:12px;">Energy: <span id="relay3_energy">0.00 Wh</span></div>
+            <div class="card-label" style="font-size:12px;">Cost: <span id="relay3_cost">₹0.00</span></div>
+        </div>
+
+        <div class="summary-card" id="relayCard4">
+            <div class="card-label">Relay 4</div>
+            <div class="card-value" id="relay4_power">0 W</div>
+            <div class="card-label" style="font-size:12px;">Energy: <span id="relay4_energy">0.00 Wh</span></div>
+            <div class="card-label" style="font-size:12px;">Cost: <span id="relay4_cost">₹0.00</span></div>
+        </div>
+    </div>
+</div>
+                </div>
+            </div>
+
+            <!-- Add Device Modal -->
+            <div id="addDeviceModal" class="modal">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal()">&times;</span>
+                    <h2>Add New Device</h2>
+                    
+                    <form id="addDeviceForm">
+                        <div class="form-group">
+                            <label for="deviceName">Device Name</label>
+                            <input type="text" id="deviceName" required placeholder="e.g., Living Room Switch">
+                        </div>
+                        <div class="form-group">
+                            <label for="deviceId">Device ID</label>
+                            <input type="text" id="deviceId" required placeholder="e.g., ESP32_Relay_Device">
+                            <small>This must match the device ID in your ESP32 code</small>
+                        </div>
+                        <div class="form-group">
+                            <label>WiFi SSID (Optional)</label>
+                            <input type="text" id="deviceSSID" placeholder="Your WiFi network name">
+                        </div>
+                        <div class="form-group">
+                            <label>WiFi Password (Optional)</label>
+                            <input type="password" id="devicePassword" placeholder="Your WiFi password">
+                        </div>
+                        <div class="form-group">
+                            <label>Setup Instructions</label>
+                            <div class="instructions">
+                                <p>1. Press and hold the BOOT button on ESP32 for 5 seconds</p>
+                                <p>2. Connect to ESP32's WiFi network</p>
+                                <p>3. Enter your WiFi credentials when prompted</p>
+                                <p>4. Device will automatically connect to AWS IoT</p>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary">Add Device</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Additional JavaScript functions for scheduling, timer, and device deletion
+        async function addSchedule() {
+            if (!currentDevice) {
+                alert('Please select a device first');
+                return;
+            }
+
+            const relay = document.getElementById('scheduleRelay').value;
+            const action = document.getElementById('scheduleAction').value;
+            const time = document.getElementById('scheduleTime').value;
+            
+            // Get selected days
+            const daySelect = document.getElementById('scheduleDays');
+            const days = Array.from(daySelect.selectedOptions).map(option => option.value);
+
+            if (!time) {
+                alert('Please select a time');
+                return;
+            }
+
+            try {
+                console.log('Creating schedule:', { deviceId: currentDevice, relay, action, time, days });
+                
+                const response = await fetch(`${API_BASE_URL}/schedules`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        deviceId: currentDevice,
+                        relay: `relay${relay}`,
+                        action: action,
+                        time: time,
+                        days: days,
+                        enabled: true
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Schedule response:', data);
+
+                if (response.ok) {
+                    alert('Schedule created successfully!');
+                    // Clear form
+                    document.getElementById('scheduleTime').value = '';
+                    daySelect.selectedIndex = -1;
+                    // Reload schedules
+                    loadSchedules();
+                } else {
+                    alert(data.error || 'Failed to create schedule');
+                }
+            } catch (error) {
+                console.error('Error creating schedule:', error);
+                alert('Error creating schedule: ' + error.message);
+            }
+        }
+
+        async function setTimer() {
+            if (!currentDevice) {
+                alert('Please select a device first');
+                return;
+            }
+
+            const relay = document.getElementById('timerRelay').value;
+            const action = document.getElementById('timerAction').value;
+            const duration = document.getElementById('timerDuration').value;
+
+            if (!duration || duration < 1) {
+                alert('Please enter a valid duration (minimum 1 minute)');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/devices/${currentDevice}/timer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        relay: `relay${relay}`,
+                        action: action,
+                        duration: parseInt(duration)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(data.message);
+                    // Update device state display
+                    loadDeviceState();
+                    // Clear timer form
+                    document.getElementById('timerDuration').value = '';
+                } else {
+                    alert(data.error || 'Failed to set timer');
+                }
+            } catch (error) {
+                alert('Error setting timer: ' + error.message);
+            }
+        }
+
+        async function loadSchedules() {
+            if (!currentDevice) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/schedules/device/${currentDevice}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displaySchedules(data.schedules || []);
+                } else {
+                    console.error('Failed to load schedules:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading schedules:', error);
+            }
+        }
+
+        function displaySchedules(schedules) {
+            const schedulesList = document.getElementById('schedulesList');
+            
+            if (schedules.length === 0) {
+                schedulesList.innerHTML = '<p>No schedules found. Create your first schedule above.</p>';
+                return;
+            }
+
+            schedulesList.innerHTML = schedules.map(schedule => `
+                <div class="schedule-item">
+                    <div class="schedule-info">
+                        <strong>Relay ${schedule.relay.slice(-1)}</strong> - 
+                        ${schedule.action.toUpperCase()} at ${schedule.time}
+                        ${schedule.days && schedule.days.length > 0 ? `on ${schedule.days.join(', ')}` : 'Daily'}
+                        <span class="status ${schedule.enabled ? 'enabled' : 'disabled'}">
+                            ${schedule.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                    </div>
+                    <div class="schedule-actions">
+                        <button onclick="toggleSchedule('${schedule.scheduleId}', ${!schedule.enabled})" class="btn-small">
+                            ${schedule.enabled ? 'Disable' : 'Enable'}
+                        </button>
+                        <button onclick="deleteSchedule('${schedule.scheduleId}')" class="btn-small btn-danger">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function toggleSchedule(scheduleId, enabled) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ enabled: enabled })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`Schedule ${enabled ? 'enabled' : 'disabled'} successfully!`);
+                    loadSchedules();
+                } else {
+                    alert(data.error || 'Failed to update schedule');
+                }
+            } catch (error) {
+                alert('Error updating schedule: ' + error.message);
+            }
+        }
+
+        async function deleteSchedule(scheduleId) {
+            if (!confirm('Are you sure you want to delete this schedule?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Schedule deleted successfully!');
+                    loadSchedules();
+                } else {
+                    alert(data.error || 'Failed to delete schedule');
+                }
+            } catch (error) {
+                alert('Error deleting schedule: ' + error.message);
+            }
+        }
+
+        // Device deletion function
+  // Device deletion function
+async function deleteDevice(deviceId, event) {
+    event.stopPropagation(); // Prevent opening device control
+    
+    if (!confirm('Are you sure you want to delete this device? This will remove all associated schedules.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/devices/${deviceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            alert('Device deleted successfully!');
+            // Reload devices list
+            loadDevices();
+        } else {
+            alert(data.error || 'Failed to delete device');
+        }
+    } catch (error) {
+        alert('Error deleting device: ' + error.message);
+    }
+}
+
+// Update the displayDevices function to include delete button
+function displayDevices(devices) {
+    const devicesList = document.getElementById('devicesList');
+    
+    if (devices.length === 0) {
+        devicesList.innerHTML = `
+            <div class="no-devices">
+                <p>No devices found. Add your first device to get started!</p>
+            </div>
+        `;
+        return;
+    }
+
+    devicesList.innerHTML = devices.map(device => `
+        <div class="device-card" onclick="openDeviceControl('${device.deviceId}')">
+            <div class="device-actions">
+                <button class="delete-device-btn" onclick="deleteDevice('${device.deviceId}', event)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <h3>${device.name}</h3>
+            <div class="device-status">
+                <span class="status-indicator ${device.status === 'online' ? '' : 'offline'}"></span>
+                <span>${device.status || 'offline'}</span>
+            </div>
+            <p>ID: ${device.deviceId}</p>
+        </div>
+    `).join('');
+}
+
+        // Update the openDeviceControl function to load schedules
+        function openDeviceControl(deviceId) {
+            currentDevice = deviceId;
+            document.getElementById('modalTitle').textContent = `Control ${deviceId}`;
+            document.getElementById('deviceModal').style.display = 'block';
+            
+            // Load device state and schedules
+            loadDeviceState();
+            loadSchedules();
+            
+            // Clear previous form values
+            document.getElementById('scheduleTime').value = '';
+            document.getElementById('scheduleDays').selectedIndex = -1;
+            document.getElementById('timerDuration').value = '';
+        }
+    </script>
+</body>
+</html>
